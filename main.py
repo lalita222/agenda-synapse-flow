@@ -2,28 +2,20 @@ import streamlit as st
 import google.generativeai as genai
 import os
 
-# --- 1. CONFIGURACIÓN IA (FIX PARA STREAMLIT CLOUD) ---
-# Obtenemos la llave de los Secrets de Streamlit
-api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get('GOOGLE_API_KEY')
+# --- 1. CONFIGURACIÓN IA (VERSIÓN COMPATIBLE) ---
+api_key = st.secrets.get("GOOGLE_API_KEY")
 
 if not api_key:
-    st.error("No se encontró la GOOGLE_API_KEY. Agrégala en 'Settings > Secrets'.")
-else:
-    # Esta línea es la clave: fuerza a usar solo la API KEY y nada más
-    genai.configure(api_key=api_key)
+    st.error("⚠️ Configura la GOOGLE_API_KEY en los Secrets.")
+    st.stop()
 
-@st.cache_resource
-def get_model():
-    # Intentamos listar modelos para verificar conexión
-    try:
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        flash = [m for m in models if "1.5-flash" in m]
-        return genai.GenerativeModel(flash[0] if flash else "gemini-1.5-flash")
-    except Exception as e:
-        # Si falla el listado, usamos un nombre genérico por defecto
-        return genai.GenerativeModel("gemini-1.5-flash")
+genai.configure(api_key=api_key)
 
-model = get_model()
+# Usamos 'gemini-pro', que es el nombre más estable y compatible
+try:
+    model = genai.GenerativeModel("gemini-pro")
+except:
+    model = genai.GenerativeModel("models/gemini-pro")
 
 # --- 2. CONFIGURACIÓN DE BLOQUES FIJOS ---
 BLOQUES_FIJOS = [
