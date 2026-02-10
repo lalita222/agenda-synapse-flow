@@ -77,45 +77,33 @@ with col1:
         btn_agendar = st.form_submit_button("AGENDAR CON IA")
 
     if btn_agendar and tarea:
-        with st.spinner("IA organizando tu semana..."):
-            viejas = "\n".join([f"{t['dia']} {t['hora']}: {t['tarea']}" for t in st.session_state.agenda])
-            prompt = f"""
-            Eres un asistente de una PROFESORA UNIVERSITARIA. 
-            Ella DICTA CLASES en estos horarios y no puede ser interrumpida: {viejas}. 
-
-            NUEVA TAREA: "{tarea}"
-            DURACIÓN: {duracion}
-
-            REGLAS OBLIGATORIAS DE DISPONIBILIDAD:
-            1. Los bloques de 'Universidad', 'Clases' y 'Pole Dance' son SAGRADOS. 
-            2. Deja 30 MINUTOS LIBRES antes de cada clase para preparación y traslados. 
-            3. Deja 15 MINUTOS LIBRES después de cada clase para preguntas de alumnos o salida.
-            4. Si la Universidad empieza a las 11:00, lo último que puede hacer termina a las 10:30.
-            5. NUNCA agendes nada durante los bloques fijos.
-
-            RESPONDE SOLO: Día | Hora inicio - Hora fin | Razón
-            """
-            try:
-                # Obtenemos la respuesta
-                response = model.generate_content(prompt)
-                res_text = response.text
-
-                # Sistema de seguridad para procesar la respuesta
-                if "|" in res_text:
-                    partes = res_text.split("|")
-                    dia_sug = partes[0].strip()
-                    # Limpiamos el día por si la IA pone "Día: Lunes"
-                    dia_sug = dia_sug.replace("Día:", "").strip()
-                    hora_sug = partes[1].strip()
-                    st.session_state.agenda.append({"dia": dia_sug, "tarea": tarea, "hora": hora_sug})
-                    st.rerun()
-                else:
-                    # Si la IA no usa barras, guardamos la respuesta completa para no perderla
-                    st.session_state.agenda.append({"dia": "Por asignar", "tarea": tarea, "hora": res_text[:30]})
-                    st.rerun()
-            except Exception as e:
-                # Si es un error de cuota o conexión real
-                st.error("La IA está descansando. Espera 15 segundos y vuelve a intentar.")
+        if not api_key:
+            st.error("Falta la API Key en Secrets")
+        else:
+            with st.spinner("IA organizando tu semana..."):
+                viejas = "\n".join([f"{t['dia']} {t['hora']}: {t['tarea']}" for t in st.session_state.agenda])
+                prompt = f"Asistente: Bloqueos: {viejas}. Nueva: {tarea} ({duracion}). Prioridad: {prioridad}. Responde corto: Día | Hora | Razón."
+                
+                try:
+                    # Añadimos una configuración de generación para que sea más rápida
+                    response = model.generate_content(
+                        prompt,
+                        generation_config={"max_output_tokens": 100, "temperature": 0.5}
+                    )
+                    
+                    res_text = response.text
+                    
+                    if "|" in res_text:
+                        partes = res_text.split("|")
+                        dia_sug = partes[0].replace("Día:", "").strip()
+                        hora_sug = partes[1].strip()
+                        st.session_state.agenda.append({"dia": dia_sug, "tarea": tarea, "hora": hora_sug})
+                        st.rerun() # Esto refresca la pantalla de inmediato
+                    else:
+                        st.warning("La IA respondió en un formato extraño. Intenta de nuevo.")
+                        
+                except Exception as e:
+                    st.error(f"Se agotó el tiempo o hubo un error: {e}")
     if st.button("🗑️ REINICIAR SEMANA"):
         st.session_state.agenda = BLOQUES_FIJOS.copy()
         st.rerun()
