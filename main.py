@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import os
 
-# --- 1. CONFIGURACIÓN IA (VERSIÓN COMPATIBLE) ---
+# --- 1. CONFIGURACIÓN IA (DETECTOR AUTOMÁTICO) ---
 api_key = st.secrets.get("GOOGLE_API_KEY")
 
 if not api_key:
@@ -11,12 +11,27 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# Usamos 'gemini-pro', que es el nombre más estable y compatible
-try:
-    model = genai.GenerativeModel("gemini-pro")
-except:
-    model = genai.GenerativeModel("models/gemini-pro")
+@st.cache_resource
+def get_working_model():
+    try:
+        # Listamos los modelos disponibles para TU cuenta
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        # Prioridad 1: Flash 1.5 (el más rápido)
+        flash = [m for m in available_models if "1.5-flash" in m]
+        if flash: return genai.GenerativeModel(flash[0])
+        
+        # Prioridad 2: Pro
+        pro = [m for m in available_models if "pro" in m]
+        if pro: return genai.GenerativeModel(pro[0])
+        
+        # Prioridad 3: El primero que funcione
+        return genai.GenerativeModel(available_models[0])
+    except Exception as e:
+        # Si todo falla, intentamos el nombre estándar sin el prefijo models/
+        return genai.GenerativeModel("gemini-1.5-flash")
 
+model = get_working_model()
 # --- 2. CONFIGURACIÓN DE BLOQUES FIJOS ---
 BLOQUES_FIJOS = [
     {"dia": "Lunes", "tarea": "Clases", "hora": "18:00 - 20:00"},
