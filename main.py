@@ -2,15 +2,26 @@ import streamlit as st
 import google.generativeai as genai
 import os
 
-# --- 1. CONFIGURACIÓN IA ---
-api_key = os.environ.get('GOOGLE_API_KEY')
-genai.configure(api_key=api_key)
+# --- 1. CONFIGURACIÓN IA (FIX PARA STREAMLIT CLOUD) ---
+# Obtenemos la llave de los Secrets de Streamlit
+api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get('GOOGLE_API_KEY')
+
+if not api_key:
+    st.error("No se encontró la GOOGLE_API_KEY. Agrégala en 'Settings > Secrets'.")
+else:
+    # Esta línea es la clave: fuerza a usar solo la API KEY y nada más
+    genai.configure(api_key=api_key)
 
 @st.cache_resource
 def get_model():
-    models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    flash = [m for m in models if "1.5-flash" in m]
-    return genai.GenerativeModel(flash[0] if flash else models[0])
+    # Intentamos listar modelos para verificar conexión
+    try:
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        flash = [m for m in models if "1.5-flash" in m]
+        return genai.GenerativeModel(flash[0] if flash else "gemini-1.5-flash")
+    except Exception as e:
+        # Si falla el listado, usamos un nombre genérico por defecto
+        return genai.GenerativeModel("gemini-1.5-flash")
 
 model = get_model()
 
